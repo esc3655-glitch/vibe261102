@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>오늘의 할일</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <div class="brand">
+        <h1>오늘의 할일</h1>
+        <p id="today" class="date"></p>
+      </div>
+      <button id="theme-toggle" class="icon-btn" type="button"></button>
+    </header>
+
+    <div id="storage-warning" class="banner banner-warn" role="alert" hidden>
+      브라우저 저장소를 사용할 수 없어 새로고침 시 데이터가 사라집니다.
+    </div>
+
+    <section class="progress" aria-label="진행률">
+      <div id="progress-bar" class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="완료율">
+        <div id="progress-fill" class="progress-fill"></div>
+      </div>
+      <p id="progress-text" class="progress-text"></p>
+    </section>
+
+    <div id="carry-banner" class="banner banner-info" hidden>
+      <span id="carry-text"></span>
+      <div class="banner-actions">
+        <button id="carry-accept" class="btn btn-primary" type="button">가져오기</button>
+        <button id="carry-dismiss" class="btn" type="button">닫기</button>
+      </div>
+    </div>
+
+    <form id="add-form" class="add-form" autocomplete="off">
+      <label for="new-text" class="sr-only">새 할 일</label>
+      <input id="new-text" class="add-input" type="text" maxlength="100" placeholder="할 일을 입력하세요..." autofocus>
+      <label for="new-priority" class="sr-only">우선순위</label>
+      <select id="new-priority" class="add-priority">
+        <option value="high">높음</option>
+        <option value="normal" selected>보통</option>
+        <option value="low">낮음</option>
+      </select>
+      <button class="add-btn" type="submit" aria-label="할 일 추가">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </form>
+
+    <nav class="filters" aria-label="필터">
+      <button type="button" class="filter" data-filter="all">전체</button>
+      <button type="button" class="filter" data-filter="active">진행 중</button>
+      <button type="button" class="filter" data-filter="done">완료</button>
+    </nav>
+
+    <ul id="list" class="list"></ul>
+    <p id="empty" class="empty" hidden></p>
+
+    <footer class="footer">
+      <button id="clear-done" class="btn btn-ghost" type="button">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 12.5h9l1-12.5"/></svg>
+        완료 항목 지우기
+      </button>
+    </footer>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden>
+    <span id="toast-text"></span>
+    <button id="toast-undo" class="toast-undo" type="button">되돌리기</button>
+  </div>
+</body>
+</html>
