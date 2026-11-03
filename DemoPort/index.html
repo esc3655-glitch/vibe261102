@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>홍길동 | 사회복지 · 사업 기획 및 운영</title>
+  <meta name="description" content="사회복지와 사업 기획·운영 분야의 경력, 프로젝트, 성과를 소개하는 프로필 사이트입니다.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="홍길동 | 사회복지 · 사업 기획 및 운영">
+  <meta property="og:description" content="사람과 지역을 잇는 사회복지 사업 기획자">
+  <meta name="theme-color" content="#1f5f5b">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    try { var t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">본문 바로가기</a>
+
+  <header class="site-header">
+    <nav class="nav container" aria-label="주 메뉴">
+      <a class="brand" href="#top" data-bind="name">홍길동</a>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-menu" aria-label="메뉴 열기">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-menu" id="nav-menu">
+        <li><a href="#about">소개</a></li>
+        <li><a href="#fields">전문 분야</a></li>
+        <li><a href="#experience">경력</a></li>
+        <li><a href="#projects">프로젝트</a></li>
+        <li><a href="#skills">역량</a></li>
+        <li><a href="#contact" class="nav-cta">연락하기</a></li>
+        <li><button class="theme-toggle" type="button" aria-label="다크 모드 전환">◐</button></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="container hero-inner">
+        <p class="eyebrow" data-bind="role"></p>
+        <h1 class="hero-title" data-bind="tagline"></h1>
+        <p class="hero-name"><strong data-bind="name"></strong> 입니다.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#contact">연락하기</a>
+          <a class="btn btn-ghost" href="#projects">프로젝트 보기</a>
+        </div>
+        <ul class="stats" id="stats"></ul>
+      </div>
+    </section>
+
+    <section class="section" id="about">
+      <div class="container about">
+        <div>
+          <h2 class="section-title">소개</h2>
+          <p class="lead" data-bind="intro"></p>
+          <ul class="chips" id="keywords"></ul>
+        </div>
+        <ul class="values" id="values"></ul>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="fields">
+      <div class="container">
+        <h2 class="section-title">전문 분야</h2>
+        <div class="field-grid" id="field-list"></div>
+      </div>
+    </section>
+
+    <section class="section" id="experience">
+      <div class="container">
+        <h2 class="section-title">경력</h2>
+        <ol class="timeline" id="timeline"></ol>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="projects">
+      <div class="container">
+        <div class="section-head">
+          <h2 class="section-title">프로젝트</h2>
+          <div class="filters" role="group" aria-label="분야별 필터" id="filters"></div>
+        </div>
+        <div class="project-grid" id="project-list"></div>
+      </div>
+    </section>
+
+    <section class="section" id="skills">
+      <div class="container two-col">
+        <div>
+          <h2 class="section-title">역량</h2>
+          <div class="skill-groups" id="skill-groups"></div>
+        </div>
+        <div>
+          <h2 class="section-title">자격 · 교육</h2>
+          <ul class="cert-list" id="cert-list"></ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section contact" id="contact">
+      <div class="container contact-inner">
+        <h2 class="section-title">함께 일하고 싶으신가요?</h2>
+        <p class="lead">협업 제안, 채용 문의, 사업 관련 상담 모두 환영합니다.</p>
+        <p class="email-line"><span class="email-text" data-email></span></p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" data-email-link href="#">메일 보내기</a>
+          <button class="btn btn-ghost" type="button" id="copy-email">이메일 복사</button>
+        </div>
+        <p class="copy-status" id="copy-status" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">© <span id="year"></span> <span data-bind="name"></span>. All rights reserved.</div>
+  </footer>
+
+  <script src="data.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
