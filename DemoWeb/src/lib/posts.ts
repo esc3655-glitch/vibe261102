@@ -1,8 +1,6 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { neon } from "@neondatabase/serverless";
 
 export type Post = {
   id: string;
@@ -15,8 +13,14 @@ export type Post = {
 
 export type PostInput = Pick<Post, "title" | "content" | "author">;
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DATA_FILE = path.join(DATA_DIR, "posts.json");
+type PostRow = {
+  id: string;
+  title: string;
+  content: string;
+  author: string;
+  created_at: Date | string;
+  updated_at: Date | string;
+};
 
 const SEED: PostInput[] = [
   {
@@ -29,7 +33,7 @@ const SEED: PostInput[] = [
     title: "데이터는 어디에 저장되나요?",
     author: "관리자",
     content:
-      "외부 DB 없이 바로 실행할 수 있도록 프로젝트의 data/posts.json 파일에 저장합니다.\n파일을 지우면 다음 실행 때 샘플 글로 다시 채워집니다.",
+      "Neon(서버리스 PostgreSQL)의 posts 테이블에 저장합니다.\n테이블이 없으면 첫 요청 때 만들어지고 샘플 글로 채워집니다.",
   },
   {
     title: "다크 모드도 지원합니다",
@@ -38,104 +42,116 @@ const SEED: PostInput[] = [
   },
 ];
 
-// 동시에 들어온 쓰기 요청이 파일을 덮어쓰지 않도록 순서대로 처리한다.
-let writeQueue: Promise<unknown> = Promise.resolve();
-
-async function readAll(): Promise<Post[]> {
-  try {
-    const raw = await fs.readFile(DATA_FILE, "utf8");
-    return JSON.parse(raw) as Post[];
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    return seed();
-  }
+function db() {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL이 설정되지 않았습니다. .env.local을 확인해 주세요.");
+  return neon(url);
 }
 
-// 파일이 없을 때 샘플 글로 만든다. 'wx'로 만들어 동시에 들어온 요청 중 하나만 쓰게 한다.
-async function seed(): Promise<Post[]> {
-  const now = Date.now();
-  const seeded = SEED.map((input, i) => {
-    const at = new Date(now - (SEED.length - i) * 60_000).toISOString();
-    return { ...input, id: randomUUID(), createdAt: at, updatedAt: at };
+// 테이블 생성과 샘플 데이터 입력은 프로세스마다 한 번만 실행한다.
+let ready: Promise<void> | null = null;
+
+function ensureSchema() {
+  ready ??= (async () => {
+    const sql = db();
+    await sql`
+      CREATE TABLE IF NOT EXISTS posts (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        title text NOT NULL,
+        content text NOT NULL,
+        author text NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`;
+    await sql`CREATE INDEX IF NOT EXISTS posts_created_at_idx ON posts (created_at DESC)`;
+    // 테이블이 비어 있을 때만 샘플 글을 넣는다(한 문장이라 동시 요청에도 중복되지 않는다).
+    const now = Date.now();
+    await sql`
+      INSERT INTO posts (title, content, author, created_at, updated_at)
+      SELECT s.title, s.content, s.author, s.at, s.at
+      FROM jsonb_to_recordset(${JSON.stringify(
+        SEED.map((p, i) => ({ ...p, at: new Date(now - (SEED.length - i) * 60_000).toISOString() })),
+      )}::jsonb) AS s(title text, content text, author text, at timestamptz)
+      WHERE NOT EXISTS (SELECT 1 FROM posts)`;
+  })().catch((error) => {
+    ready = null;
+    throw error;
   });
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  try {
-    await fs.writeFile(DATA_FILE, JSON.stringify(seeded, null, 2), { encoding: "utf8", flag: "wx" });
-    return seeded;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-    return JSON.parse(await fs.readFile(DATA_FILE, "utf8")) as Post[];
-  }
+  return ready;
 }
 
-async function writeAll(posts: Post[]) {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  const tmp = `${DATA_FILE}.${randomUUID()}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(posts, null, 2), "utf8");
-  await fs.rename(tmp, DATA_FILE);
+async function query() {
+  await ensureSchema();
+  return db();
 }
 
-function mutate<T>(fn: (posts: Post[]) => { posts: Post[]; result: T }): Promise<T> {
-  const run = writeQueue.then(async () => {
-    const { posts, result } = fn(await readAll());
-    await writeAll(posts);
-    return result;
-  });
-  writeQueue = run.catch(() => undefined);
-  return run;
-}
+const iso = (v: Date | string) => new Date(v).toISOString();
 
-export const PAGE_SIZE = 10;
-
-export async function listPosts({ query = "", page = 1 }: { query?: string; page?: number }) {
-  const q = query.trim().toLowerCase();
-  const all = (await readAll())
-    .filter(
-      (p) =>
-        !q ||
-        p.title.toLowerCase().includes(q) ||
-        p.content.toLowerCase().includes(q) ||
-        p.author.toLowerCase().includes(q),
-    )
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-  const totalPages = Math.max(1, Math.ceil(all.length / PAGE_SIZE));
-  const current = Math.min(Math.max(1, page), totalPages);
+function toPost(row: PostRow): Post {
   return {
-    posts: all.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE),
-    total: all.length,
-    page: current,
-    totalPages,
+    id: row.id,
+    title: row.title,
+    content: row.content,
+    author: row.author,
+    createdAt: iso(row.created_at),
+    updatedAt: iso(row.updated_at),
   };
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export const PAGE_SIZE = 10;
+
+export async function listPosts({ query: q = "", page = 1 }: { query?: string; page?: number }) {
+  const sql = await query();
+  const term = q.trim();
+  const pattern = term ? `%${term.replace(/[\\%_]/g, "\\$&")}%` : "%";
+
+  const [{ count }] = (await sql`
+    SELECT count(*)::int AS count FROM posts
+    WHERE title ILIKE ${pattern} OR content ILIKE ${pattern} OR author ILIKE ${pattern}`) as { count: number }[];
+
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+  const current = Math.min(Math.max(1, page), totalPages);
+  const rows = (await sql`
+    SELECT * FROM posts
+    WHERE title ILIKE ${pattern} OR content ILIKE ${pattern} OR author ILIKE ${pattern}
+    ORDER BY created_at DESC
+    LIMIT ${PAGE_SIZE} OFFSET ${(current - 1) * PAGE_SIZE}`) as PostRow[];
+
+  return { posts: rows.map(toPost), total: count, page: current, totalPages };
+}
+
 export async function getPost(id: string) {
-  return (await readAll()).find((p) => p.id === id) ?? null;
+  if (!UUID.test(id)) return null;
+  const sql = await query();
+  const rows = (await sql`SELECT * FROM posts WHERE id = ${id}`) as PostRow[];
+  return rows[0] ? toPost(rows[0]) : null;
 }
 
-export function createPost(input: PostInput) {
-  return mutate((posts) => {
-    const now = new Date().toISOString();
-    const post: Post = { ...input, id: randomUUID(), createdAt: now, updatedAt: now };
-    return { posts: [...posts, post], result: post };
-  });
+export async function createPost(input: PostInput) {
+  const sql = await query();
+  const rows = (await sql`
+    INSERT INTO posts (title, content, author)
+    VALUES (${input.title}, ${input.content}, ${input.author})
+    RETURNING *`) as PostRow[];
+  return toPost(rows[0]);
 }
 
-export function updatePost(id: string, input: PostInput) {
-  return mutate((posts) => {
-    let updated: Post | null = null;
-    const next = posts.map((p) => {
-      if (p.id !== id) return p;
-      updated = { ...p, ...input, updatedAt: new Date().toISOString() };
-      return updated;
-    });
-    return { posts: next, result: updated as Post | null };
-  });
+export async function updatePost(id: string, input: PostInput) {
+  if (!UUID.test(id)) return null;
+  const sql = await query();
+  const rows = (await sql`
+    UPDATE posts
+    SET title = ${input.title}, content = ${input.content}, author = ${input.author}, updated_at = now()
+    WHERE id = ${id}
+    RETURNING *`) as PostRow[];
+  return rows[0] ? toPost(rows[0]) : null;
 }
 
-export function deletePost(id: string) {
-  return mutate((posts) => {
-    const next = posts.filter((p) => p.id !== id);
-    return { posts: next, result: next.length !== posts.length };
-  });
+export async function deletePost(id: string) {
+  if (!UUID.test(id)) return false;
+  const sql = await query();
+  const rows = await sql`DELETE FROM posts WHERE id = ${id} RETURNING id`;
+  return (rows as unknown[]).length > 0;
 }
